@@ -234,7 +234,11 @@ class Level(commands.Cog):
     @commands.command()
     async def sad(self, ctx, *, message):
         sad = message.replace('o', '<:sad:562509148239953940>')
-        await ctx.send(sad)
+        try:
+            await ctx.send(sad)
+        except discord.errors.HTTPException:
+            await ctx.send('Message was t<:sad:562509148239953940><:sad:562509148239953940> l<:sad:562509148239953940>ng to send <:sad:562509148239953940>')
+
 
     @commands.command(aliases=['bg'])
     async def background(self, ctx, url='none'):
