@@ -41,6 +41,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+priv_channels = (404841053242523668, 738075158467837962, 761039653951766569, 821798504405663815)
+
 
 class LevelDatabase(db.Model):
     __tablename__ = 'levels'
@@ -88,19 +90,21 @@ async def add_xp(author, channel):
             num = random.randint(15, 25)  # add random xp between 15 and 25
             user_row.xp_lvl += num
             user_row.last_modified = current  # update time for xp
-            print(f'{author} has now {user_row.xp} xp')
             lvl = user_row.level
             lvl_calc = 5 * (lvl ** 2) + (50 * lvl) + 100 - user_row.xp_lvl  # how much xp needed for the next level
-            print(lvl_calc)
             if lvl_calc <= 0:
                 user_row.level += 1
                 user_row.xp_lvl = 0 + abs(
                     lvl_calc)  # level up, reset the xp counter and add what remained from the last level
-                print(f'User {author} has leveled up to level {user_row.level}.')
                 embed = discord.Embed(title='',
                                       description=f'{author.mention} has leveled up to level **{user_row.level}**, chuckle.',
                                       color=0xff005a)
-                await channel.send(embed=embed)
+                print(channel.id)
+                if channel.id not in priv_channels:
+                    await channel.send(embed=embed)
+                else:
+                    channel.id = 343323003288813569
+                    await channel.send(embed=embed)
             db.session.commit()
             return
     else:
@@ -119,7 +123,6 @@ async def check_level(author):
 
 async def get_all(ctx, start, end):
     err = False
-    exc = 'none'
     stats = {}
     list_db = db.session.query(LevelDatabase).order_by(desc(LevelDatabase.xp))[start:end]
     pos = start + 1
@@ -134,7 +137,7 @@ async def get_all(ctx, start, end):
             try:
                 stats[await ctx.guild.fetch_member(
                     ids.id_user)] = f'Total XP: {ids.xp} | Level: {ids.level} | Position: {pos}\n'
-            except Exception as exc:
+            except Exception:
                 err = True
                 stats[ids.id_user] = f'Total XP: {ids.xp} | Level: {ids.level} | Position: {pos}\n'
             pos += 1
@@ -148,7 +151,7 @@ async def change_bg(user_id, url):
         url = 'https://cdn.discordapp.com/attachments/819169940400635908/820605358930001930/bg_empty.png'
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'})
-        bg = Image.open(urllib.request.urlopen(req)).convert('RGBA').crop((0, 0, 934, 282))
+        Image.open(urllib.request.urlopen(req)).convert('RGBA').crop((0, 0, 934, 282))
     except Exception as error1:
         return str(error1)
     url_db = db.session.query(LevelDatabase).filter_by(id_user=str(user_id)).first()
@@ -157,7 +160,7 @@ async def change_bg(user_id, url):
     return '1'
 
 
-def add(id_user, xp, level):  # XP TOTALI - XP LIVELLI PREC
+def add(id_user, xp, level):  # XP TOT - XP PREV LEVELS
     if db.session.query(LevelDatabase).filter(
             LevelDatabase.id_user == str(id_user)).count() == 0:  # if user doesn't appear in the db
 
@@ -218,12 +221,27 @@ class Level(commands.Cog):
     def __init__(self, client):
         self.client = client
 
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if not message.author.bot:
+            await add_xp(message.author, message.channel)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        if not member.bot:
+            await add_new_user(member.id)
+
+    @commands.command()
+    async def sad(self, ctx, *, message):
+        sad = message.replace('o', '<:sad:562509148239953940>')
+        await ctx.send(sad)
+
     @commands.command(aliases=['bg'])
     async def background(self, ctx, url='none'):
         value = await change_bg(ctx.author.id, url)
         if value != '1':
             await ctx.reply(
-                f"**Fool.**\nCouldn't get an image from the link, try with a different link.\n```{value}```",
+                f"**Fool.**\nCouldn't get an image from the link, please specify a valid link to an image to set as background for your rank card.\n```{value}```",
                 mention_author=False)
         else:
             await ctx.reply(
@@ -258,16 +276,6 @@ class Level(commands.Cog):
             return await ctx.reply(f'There is no such thing as page {page + 1}.', mention_author=False)
         return await ctx.reply(message, mention_author=False)
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if not message.author.bot:
-            await add_xp(message.author, message.channel)
-
-    @commands.Cog.listener()
-    async def on_member_join(self, member):
-        if not member.bot:
-            await add_new_user(member.id)
-
     @commands.command()
     async def rank(self, ctx, user='none'):
 
@@ -296,7 +304,7 @@ class Level(commands.Cog):
                 draw.ellipse((0, 0) + (200, 200), fill=255)
 
                 # import bg from link and avatar
-                overlay = Image.open("pics/light.png").convert('RGBA')
+                overlay = Image.open("pics/overlay.png").convert('RGBA')
                 img = Image.open("pics/avatar.png").convert('RGBA').resize((200, 200), resample=0)
                 try:
                     req = urllib.request.Request(level[4],
@@ -311,18 +319,15 @@ class Level(commands.Cog):
 
                 # fit overlay on bg
                 bg.paste(overlay, (0, 0), overlay)
-                ImageOps.expand(bg, border=300, fill=(37, 150, 190, 0)).save('pics/expand.png')
 
                 # fit mask on avatar
                 avatar = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
                 avatar.putalpha(mask)
 
                 # paste avatar on bg
-                bg.paste(avatar, (36, 48), avatar)
-                bg.save('pics/bg.png', "png")
+                bg.paste(avatar, (36, 43), avatar)
 
                 # add text to it
-                bg = Image.open("pics/bg.png")
                 bg1 = ImageDraw.Draw(bg)
                 font = ImageFont.truetype('pics/sansb.ttf', 45)
                 bg1.text((310, 132), f'Level: {level[0]} | Total XP: {level[1]}', font=font,
