@@ -82,7 +82,7 @@ async def add_xp(author, channel):
 
         user_row = db.session.query(LevelDatabase).filter_by(id_user=str(author.id)).first()
         current = int(time.time())  # current time
-        if current - user_row.last_modified < 0:  # if current time is less than a minute ahead of last time xp was added, do nothing
+        if current - user_row.last_modified < 60:  # if current time is less than a minute ahead of last time xp was added, do nothing
             user_row.last_modified = current
             db.session.commit()
             return
