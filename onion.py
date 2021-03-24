@@ -18,6 +18,16 @@ async def on_ready():
     print(
         f'h'
     )
+    
+    
+@bot.command()
+async def sad(ctx, *, message):
+    sad1 = message.replace('o', '<:sad:562509148239953940>')
+    sad2 = sad1.replace('O', '<:sad:562509148239953940>')
+    try:
+        await ctx.send(sad2)
+    except discord.errors.HTTPException:
+        await ctx.send('Message was t<:sad:562509148239953940><:sad:562509148239953940> l<:sad:562509148239953940>ng to send <:sad:562509148239953940>')
 
 
 @bot.event

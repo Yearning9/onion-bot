@@ -5,12 +5,12 @@ from discord.ext import commands
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
-import urllib
-from urllib.request import Request
+import aiohttp
+from io import BytesIO
 
 try:
     from PIL import Image, ImageFile, ImageOps, ImageDraw, ImageFont
-except Exception as error:          # this is to avoid heroku being dum dum with pillow dependency
+except Exception as error:  # this is to avoid heroku being dum dum with pillow dependency
     print(error)
     import Image
     import ImageFile
@@ -82,13 +82,14 @@ async def add_xp(author, channel):
 
         user_row = db.session.query(LevelDatabase).filter_by(id_user=str(author.id)).first()
         current = int(time.time())  # current time
-        if current - user_row.last_modified < 60:  # if current time is less than a minute ahead of last time xp was added, do nothing
+        if current - user_row.last_modified < 0:  # if current time is less than a minute ahead of last time xp was added, do nothing
             user_row.last_modified = current
             db.session.commit()
             return
         else:
             num = random.randint(15, 25)  # add random xp between 15 and 25
             user_row.xp_lvl += num
+            user_row.xp += num
             user_row.last_modified = current  # update time for xp
             lvl = user_row.level
             lvl_calc = 5 * (lvl ** 2) + (50 * lvl) + 100 - user_row.xp_lvl  # how much xp needed for the next level
@@ -149,9 +150,15 @@ async def get_all(ctx, start, end):
 async def change_bg(user_id, url):
     if url == 'none':
         url = 'https://cdn.discordapp.com/attachments/819169940400635908/820605358930001930/bg_empty.png'
+        url_db = db.session.query(LevelDatabase).filter_by(id_user=str(user_id)).first()
+        url_db.bg_link = url
+        db.session.commit()
+        return '1'
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'})
-        Image.open(urllib.request.urlopen(req)).convert('RGBA').crop((0, 0, 934, 282))
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'}) as r:
+                pic = BytesIO(await r.read())
+                Image.open(pic).convert('RGBA').crop((0, 0, 934, 282))
     except Exception as error1:
         return str(error1)
     url_db = db.session.query(LevelDatabase).filter_by(id_user=str(user_id)).first()
@@ -231,26 +238,18 @@ class Level(commands.Cog):
         if not member.bot:
             await add_new_user(member.id)
 
-    @commands.command()
-    async def sad(self, ctx, *, message):
-        sad = message.replace('o', '<:sad:562509148239953940>')
-        try:
-            await ctx.send(sad)
-        except discord.errors.HTTPException:
-            await ctx.send('Message was t<:sad:562509148239953940><:sad:562509148239953940> l<:sad:562509148239953940>ng to send <:sad:562509148239953940>')
-
-
     @commands.command(aliases=['bg'])
     async def background(self, ctx, url='none'):
-        value = await change_bg(ctx.author.id, url)
-        if value != '1':
-            await ctx.reply(
-                f"**Fool.**\nCouldn't get an image from the link, please specify a valid link to an image to set as background for your rank card.\n```{value}```",
-                mention_author=False)
-        else:
-            await ctx.reply(
-                'Changed background image <:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:737675219937787974>\n(Use .bg to set default bg)',
-                mention_author=False)
+        with ctx.typing():
+            value = await change_bg(ctx.author.id, url)
+            if value != '1':
+                return await ctx.reply(
+                    f"**Fool.**\nCouldn't get an image from the link, please specify a valid link to an image to set as background for your rank card.\n```{value}```",
+                    mention_author=False)
+            else:
+                return await ctx.reply(
+                    'Changed background image <:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:737675219937787974>\n(Use .bg to set default bg)',
+                    mention_author=False)
 
     @commands.command()
     async def add(self, ctx, id_user, xp, lvl):
@@ -269,16 +268,39 @@ class Level(commands.Cog):
 
     @commands.command(aliases=['leaderboard', 'levels'])
     async def lb(self, ctx, page: int = 1):
-        message = '```\n'
-        page -= 1
+
+        if not page >= 1:
+            return await ctx.reply(f'There is no such thing as page {page}.', mention_author=False)
+
         with ctx.typing():
-            stats = await get_all(ctx, start=page * 20, end=(page * 20) + 20)
-            for i in stats.keys():
-                message += f'{i}: {stats[i]}'
-            message += '```'
-        if message == '```\n```':
-            return await ctx.reply(f'There is no such thing as page {page + 1}.', mention_author=False)
-        return await ctx.reply(message, mention_author=False)
+
+            err = False
+            added = False
+            page -= 1
+            list_db = db.session.query(LevelDatabase).order_by(desc(LevelDatabase.xp))[page*21:(page*21)+21]
+            pos = (page * 21) + 1
+
+            lb_emb = discord.Embed(
+                title="r/surrealmemes Server Leaderboard",
+                description=f"Page {page+1} | Positions: {(page * 21) + 1} to {(page * 21) + 21}",
+                color=0xff005a
+            )
+
+            for ids in list_db:
+                try:
+                    lb_emb.add_field(name=f'{pos} | {str(await ctx.guild.fetch_member(ids.id_user))[:-5]}', value=f"Total XP: {ids.xp} | Level: {ids.level}")
+                    added = True
+                except discord.errors.NotFound:
+                    lb_emb.add_field(name=f'{pos} | {ids.id_user}', value=f"Total XP: {ids.xp} | Level: {ids.level}")
+                    added = True
+                    err = True
+                pos += 1
+            if not added:
+                return await ctx.reply(f'There is no such thing as page {page+1}.', mention_author=False)
+            if err:
+                print('There was an error making the lb, probably a user in the page isn\'t in the server')
+        return await ctx.reply(embed=lb_emb, mention_author=False)
+
 
     @commands.command()
     async def rank(self, ctx, user='none'):
@@ -289,9 +311,10 @@ class Level(commands.Cog):
         if len(ctx.message.mentions) == 0:
             if not user.isnumeric():
                 return await ctx.reply('Specify a user, or the user will specify you.', mention_author=False)
-            if len(user) != 18:
-                return await ctx.reply('Specify a user, or the user will specify you.', mention_author=False)
-
+            try:
+                await ctx.guild.fetch_member(user)
+            except discord.errors.NotFound:
+                return await ctx.reply('Specify a user, or the user will specify you\n(Invalid User ID).', mention_author=False)
         else:
             user = ctx.message.mentions[0].id
         level = await check_level(user)
@@ -299,54 +322,56 @@ class Level(commands.Cog):
         try:
             if level[0] >= 0:
 
-                member = await ctx.guild.fetch_member(user)
+                with ctx.typing():
 
-                # mask for circle crop
-                await member.avatar_url.save("pics/avatar.png")
-                mask = Image.new('L', (200, 200), 0)
-                draw = ImageDraw.Draw(mask)
-                draw.ellipse((0, 0) + (200, 200), fill=255)
+                    member = await ctx.guild.fetch_member(user)
 
-                # import bg from link and avatar
-                overlay = Image.open("pics/overlay.png").convert('RGBA')
-                img = Image.open("pics/avatar.png").convert('RGBA').resize((200, 200), resample=0)
-                try:
-                    req = urllib.request.Request(level[4],
-                                                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'})
-                    bg = Image.open(urllib.request.urlopen(req)).convert('RGBA').resize((934, 282)).crop(
-                        (0, 0, 934, 282))  # TODO: Crop? Resize?
-                except Exception as err:
-                    await ctx.reply(
-                        f'There was an error while retrieving/processing the background image, using default image\n```{err}\nWelcome to the Cloud Room.```',
-                        mention_author=False)
-                    bg = Image.open('pics/bg_empty.png').convert('RGBA')
+                    # mask for circle crop
+                    await member.avatar_url.save("pics/avatar.png")
+                    mask = Image.new('L', (200, 200), 0)
+                    draw = ImageDraw.Draw(mask)
+                    draw.ellipse((0, 0) + (200, 200), fill=255)
 
-                # fit overlay on bg
-                bg.paste(overlay, (0, 0), overlay)
+                    # import bg from link and avatar
+                    overlay = Image.open("pics/overlay.png").convert('RGBA')
+                    img = Image.open("pics/avatar.png").convert('RGBA').resize((200, 200), resample=0)
+                    try:
+                        async with aiohttp.ClientSession() as session1:
+                            async with session1.get(level[4], headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'}) as r:
+                                pic = BytesIO(await r.read())
+                                bg = Image.open(pic).convert('RGBA').resize((934, 282))
+                    except Exception as err:
+                        await ctx.reply(
+                            f'There was an error while retrieving/processing the background image, using default image\n```{err}\nWelcome to the Cloud Room.```',
+                            mention_author=False)
+                        bg = Image.open('pics/bg_empty.png').convert('RGBA')
 
-                # fit mask on avatar
-                avatar = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
-                avatar.putalpha(mask)
+                    # fit overlay on bg
+                    bg.paste(overlay, (0, 0), overlay)
 
-                # paste avatar on bg
-                bg.paste(avatar, (36, 43), avatar)
+                    # fit mask on avatar
+                    avatar = ImageOps.fit(img, mask.size, centering=(0.5, 0.5))
+                    avatar.putalpha(mask)
 
-                # add text to it
-                bg1 = ImageDraw.Draw(bg)
-                font = ImageFont.truetype('pics/sansb.ttf', 45)
-                bg1.text((310, 132), f'Level: {level[0]} | Total XP: {level[1]}', font=font,
-                         fill=(40, 40, 40))  # text shadow
-                bg1.text((312, 130), f'Level: {level[0]} | Total XP: {level[1]}', font=font,
-                         fill=(0, 0, 0))  # actual text
+                    # paste avatar on bg
+                    bg.paste(avatar, (36, 43), avatar)
 
-                # level meter
-                perc = round(level[2] / level[3], 2)
-                thing = round_rectangle((int(563 * perc), 20), 10, (37, 150, 190, 0))
-                bg.paste(thing, (325, 187))
+                    # add text to it
+                    bg1 = ImageDraw.Draw(bg)
+                    font = ImageFont.truetype('pics/sansb.ttf', 45)
+                    bg1.text((310, 132), f'Level: {level[0]} | Total XP: {level[1]}', font=font,
+                             fill=(40, 40, 40))  # text shadow
+                    bg1.text((312, 130), f'Level: {level[0]} | Total XP: {level[1]}', font=font,
+                             fill=(0, 0, 0))  # actual text
 
-                bg.save("pics/big.png")
+                    # level meter
+                    perc = round(level[2] / level[3], 2)
+                    thing = round_rectangle((int(563 * perc), 20), 10, (37, 150, 190, 0))
+                    bg.paste(thing, (325, 187))
 
-                file = discord.File('pics/big.png')
+                    bg.save("pics/big.png")
+
+                    file = discord.File('pics/big.png')
 
                 await ctx.reply(file=file, mention_author=False)
             else:
@@ -356,11 +381,6 @@ class Level(commands.Cog):
             return await ctx.reply(
                 'There was an error! (Maybe user isn\'t in the server?) The sky has now turned a funky color.',
                 mention_author=False)
-
-    @commands.command()
-    async def embedtest(self, ctx):
-        embed = discord.Embed(title='epic embed fail', description='', color=0xff005a)
-        await ctx.send(embed=embed)
 
 
 def setup(client):
