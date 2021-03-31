@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 import aiohttp
 from io import BytesIO
+import markovify
 
 try:
     from PIL import Image, ImageFile, ImageOps, ImageDraw, ImageFont
@@ -251,6 +252,38 @@ class Level(commands.Cog):
                     'Changed background image <:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:737675219937787974>\n(Use .bg to set default bg)',
                     mention_author=False)
 
+    @commands.command(aliases=['haelp', 'commands'])
+    async def help(self, ctx):
+        help_em = discord.Embed(
+            title='command the onion',
+            color=0xff005a
+        )
+        help_em.add_field(name='.rank (User ID/tag [optional])', value='Current rank shown in a convenient card™')
+        help_em.add_field(name='.lb/.leaderboard/.levels (Page #, default is 1)', value='Leaderboard of powerful flesh ridden beings', inline=False)
+        help_em.add_field(name='.background/.bg (image link)', value='Change the background of your .rank card, if link isn\'t specified it restores the default (has to be link to an image and not a file)', inline=False)
+        help_em.add_field(name='.mk', value='Generate wacky and unpredictable sentences, Reginald will watch from the heavens :place_of_worship:')
+        help_em.set_thumbnail(url='https://cdn.discordapp.com/attachments/819169940400635908/825316562633359390/d.png')
+        help_em.set_footer(text='remember to onion your lawn')
+
+        await ctx.reply(embed=help_em, mention_author=False)
+
+    @commands.command()
+    async def mk(self, ctx):
+        chan = discord.Client.get_channel(self.client, id=294479294040768524)
+        messages = await chan.history(limit=500).flatten()
+        thing = ""
+        forbidden = (".mk", ".rank", ".lb", "!rank", "!levels")
+        for msg in messages:
+            if not msg.author.bot:
+                if msg.content not in forbidden:
+                    thing += f"{msg.content}\n"
+        markov = markovify.NewlineText(thing)
+        try:
+            await ctx.send(markov.make_sentence(tries=200))
+        except discord.errors.HTTPException:
+            print('sad')
+            return
+
     @commands.command()
     async def add(self, ctx, id_user, xp, lvl):
         if ctx.author.id not in add_users:
@@ -277,18 +310,19 @@ class Level(commands.Cog):
             err = False
             added = False
             page -= 1
-            list_db = db.session.query(LevelDatabase).order_by(desc(LevelDatabase.xp))[page*21:(page*21)+21]
+            list_db = db.session.query(LevelDatabase).order_by(desc(LevelDatabase.xp))[page * 21:(page * 21) + 21]
             pos = (page * 21) + 1
 
             lb_emb = discord.Embed(
                 title="r/surrealmemes Server Leaderboard",
-                description=f"Page {page+1} | Positions: {(page * 21) + 1} to {(page * 21) + 21}",
+                description=f"Page {page + 1} | Positions: {(page * 21) + 1} to {(page * 21) + 21}",
                 color=0xff005a
             )
 
             for ids in list_db:
                 try:
-                    lb_emb.add_field(name=f'{pos} | {str(await ctx.guild.fetch_member(ids.id_user))[:-5]}', value=f"Total XP: {ids.xp} | Level: {ids.level}")
+                    lb_emb.add_field(name=f'{pos} | {str(await ctx.guild.fetch_member(ids.id_user))[:-5]}',
+                                     value=f"Total XP: {ids.xp} | Level: {ids.level}")
                     added = True
                 except discord.errors.NotFound:
                     lb_emb.add_field(name=f'{pos} | {ids.id_user}', value=f"Total XP: {ids.xp} | Level: {ids.level}")
@@ -296,11 +330,10 @@ class Level(commands.Cog):
                     err = True
                 pos += 1
             if not added:
-                return await ctx.reply(f'There is no such thing as page {page+1}.', mention_author=False)
+                return await ctx.reply(f'There is no such thing as page {page + 1}.', mention_author=False)
             if err:
                 print('There was an error making the lb, probably a user in the page isn\'t in the server')
         return await ctx.reply(embed=lb_emb, mention_author=False)
-
 
     @commands.command()
     async def rank(self, ctx, user='none'):
@@ -314,7 +347,8 @@ class Level(commands.Cog):
             try:
                 await ctx.guild.fetch_member(user)
             except discord.errors.NotFound:
-                return await ctx.reply('Specify a user, or the user will specify you\n(Invalid User ID).', mention_author=False)
+                return await ctx.reply('Specify a user, or the user will specify you\n(Invalid User ID).',
+                                       mention_author=False)
         else:
             user = ctx.message.mentions[0].id
         level = await check_level(user)

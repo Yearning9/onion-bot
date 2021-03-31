@@ -1,4 +1,7 @@
+import io
 import random
+import urllib
+
 import discord
 from discord.ext import commands
 
@@ -18,8 +21,18 @@ async def on_ready():
     print(
         f'h'
     )
-    
-    
+
+@bot.command(aliases=['inspiro'])
+async def inspire(ctx):
+    with ctx.typing():
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:59.0) Gecko/20100101 Firefox/59.0"
+        api_url = "http://inspirobot.me/api?generate=true"
+        path_response = urllib.request.urlopen(urllib.request.Request(api_url, headers={"User-Agent": user_agent}))
+        image = urllib.request.urlopen(
+            urllib.request.Request(path_response.read().decode("utf-8"), headers={"User-Agent": user_agent}))
+        data = io.BytesIO(image.read())
+    await ctx.send(file=discord.File(data, "inspirobot.jpg"))
+
 @bot.command()
 async def sad(ctx, *, message):
     sad1 = message.replace('o', '<:sad:562509148239953940>')
