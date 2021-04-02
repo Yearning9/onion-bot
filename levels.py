@@ -44,6 +44,10 @@ db = SQLAlchemy(app)
 
 priv_channels = (404841053242523668, 738075158467837962, 761039653951766569, 821798504405663815)
 
+txt = open('funny.txt', 'r', encoding='utf-8')
+thing = txt.read()
+txt.close()
+
 
 class LevelDatabase(db.Model):
     __tablename__ = 'levels'
@@ -233,6 +237,14 @@ class Level(commands.Cog):
     async def on_message(self, message):
         if not message.author.bot:
             await add_xp(message.author, message.channel)
+        if message.channel.id == 494549477407850526 and message.author.id != 787735815575961610:
+            markov = markovify.NewlineText(thing)
+            try:
+                funny = markov.make_sentence(tries=200)
+                await message.channel.send(funny)
+            except discord.errors.HTTPException:
+                print('sad')
+
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -261,7 +273,8 @@ class Level(commands.Cog):
         help_em.add_field(name='.rank (User ID/tag [optional])', value='Current rank shown in a convenient card™')
         help_em.add_field(name='.lb/.leaderboard/.levels (Page #, default is 1)', value='Leaderboard of powerful flesh ridden beings', inline=False)
         help_em.add_field(name='.background/.bg (image link)', value='Change the background of your .rank card, if link isn\'t specified it restores the default (has to be link to an image and not a file)', inline=False)
-        help_em.add_field(name='.mk', value='Generate wacky and unpredictable sentences, Reginald will watch from the heavens :place_of_worship:')
+        help_em.add_field(name='.mk', value='Generate wacky and unpredictable sentences, Reginald will watch from the heavens :place_of_worship:', inline=False)
+        help_em.add_field(name='.inspire/.inspiro', value='You are about to turn into a silly member of the species homo sapiens. That\'s right')
         help_em.set_thumbnail(url='https://cdn.discordapp.com/attachments/819169940400635908/825316562633359390/d.png')
         help_em.set_footer(text='remember to onion your lawn')
 
@@ -269,14 +282,6 @@ class Level(commands.Cog):
 
     @commands.command()
     async def mk(self, ctx):
-        chan = discord.Client.get_channel(self.client, id=294479294040768524)
-        messages = await chan.history(limit=500).flatten()
-        thing = ""
-        forbidden = (".mk", ".rank", ".lb", "!rank", "!levels")
-        for msg in messages:
-            if not msg.author.bot:
-                if msg.content not in forbidden:
-                    thing += f"{msg.content}\n"
         markov = markovify.NewlineText(thing)
         try:
             await ctx.send(markov.make_sentence(tries=200))
