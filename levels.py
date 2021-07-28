@@ -42,7 +42,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-priv_channels = (404841053242523668, 738075158467837962, 761039653951766569, 821798504405663815)
+priv_channels = (404841053242523668, 738075158467837962, 761039653951766569, 821798504405663815, 379843937377976321)
 
 txt = open('funny.txt', 'r', encoding='utf-8')
 thing = txt.read()
@@ -82,6 +82,8 @@ async def add_new_user(author):
 
 
 async def add_xp(author, channel):
+    channel1 = channel
+    original = channel.id
     if db.session.query(LevelDatabase).filter(
             LevelDatabase.id_user == str(author.id)).count() != 0:  # if user is in database
 
@@ -100,13 +102,112 @@ async def add_xp(author, channel):
             lvl_calc = 5 * (lvl ** 2) + (50 * lvl) + 100 - user_row.xp_lvl  # how much xp needed for the next level
             if lvl_calc <= 0:
                 user_row.level += 1
+                lvl += 1
                 user_row.xp_lvl = 0 + abs(
                     lvl_calc)  # level up, reset the xp counter and add what remained from the last level
+                descr = f'{author.mention} has leveled up to level **{lvl}**, chuckle.'
+                if lvl == 1:
+                    role = discord.utils.get(author.guild.roles, name="The Fabricated")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            print(channel1.id, channel.id)
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 5:
+                    role = discord.utils.get(author.guild.roles, name="The Undying")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 11:
+                    role = discord.utils.get(author.guild.roles, name="The Condemned")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 17:
+                    role = discord.utils.get(author.guild.roles, name="The Frightening")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 23:
+                    role = discord.utils.get(author.guild.roles, name="The Unholy")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 31:
+                    role = discord.utils.get(author.guild.roles, name="The Forbidden")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 41:
+                    role = discord.utils.get(author.guild.roles, name="The Hurtful")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
+                elif lvl == 53:
+                    role = discord.utils.get(author.guild.roles, name="The Hatred")
+                    if not role:
+                        channel1.id = 343323003288813569
+                        await channel1.send("I couldn't find the role :sad:")
+                    else:
+                        try:
+                            await author.add_roles(role)
+                            descr += f"\nYou have also gained the cursed role of: {role.name}"
+                        except discord.Forbidden:
+                            channel1.id = 343323003288813569
+                            await channel1.send(f"I would have added the role {role.name} to {author.name}, but I lack the permission to do so :sadsadsad:")
                 embed = discord.Embed(title='',
-                                      description=f'{author.mention} has leveled up to level **{user_row.level}**, chuckle.',
+                                      description=descr,
                                       color=0xff005a)
-                print(channel.id)
                 if channel.id not in priv_channels:
+                    channel.id = original
                     await channel.send(embed=embed)
                 else:
                     channel.id = 343323003288813569
@@ -237,13 +338,14 @@ class Level(commands.Cog):
     async def on_message(self, message):
         if not message.author.bot:
             await add_xp(message.author, message.channel)
-        if message.channel.id == 494549477407850526 and message.author.id != 787735815575961610:
-            markov = markovify.NewlineText(thing)
-            try:
-                funny = markov.make_sentence(tries=200)
-                await message.channel.send(funny)
-            except discord.errors.HTTPException:
-                print('sad')
+        if message.channel.id == 494549477407850526 and message.author.id != 787735815575961610 and message.author.id != 492893838575271936:
+            if random.randint(0, 100) > 50:
+                markov = markovify.NewlineText(thing)
+                try:
+                    funny = markov.make_sentence(tries=200)
+                    await message.channel.send(funny)
+                except discord.errors.HTTPException:
+                    print('sad')
 
 
     @commands.Cog.listener()
